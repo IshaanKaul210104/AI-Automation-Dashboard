@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import json, os, datetime, importlib
 from fastapi.staticfiles import StaticFiles
+from scripts import pdf_summarizer
 
 app = FastAPI(title="Automation Dashboard API")
 
@@ -30,8 +31,8 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 def read_root():
     return {"message": "Automation Dashboard Backend Running"}
 
-@app.post("/run/{script_name}")
-async def run_script(script_name: str, request: Request):
+@app.post("/run/webscraper")
+async def run_script(request: Request):
     """
     Dynamically runs scripts like 'webscraper.py' under /scripts folder.
     Accepts optional JSON body (e.g., {'url': 'https://example.com'}).
@@ -42,13 +43,9 @@ async def run_script(script_name: str, request: Request):
 
     try:
         try:
-            script_module = importlib.import_module(f"scripts.{script_name}")
+            script_module = importlib.import_module(f"scripts.webscraper")
         except ModuleNotFoundError:
-            # fallback alias: if 'scraper' was sent, try 'webscraper'
-            if script_name == "scraper":
-                script_module = importlib.import_module("scripts.webscraper")
-            else:
-                raise
+            raise
 
         # ✅ Ensure URL is valid or fallback to default
         url = body.get("url", "").strip() or "https://www.theverge.com"
@@ -60,19 +57,19 @@ async def run_script(script_name: str, request: Request):
         elif hasattr(script_module, "run_web_scraper"):
             result = script_module.run_web_scraper(url)
         else:
-            raise Exception(f"No valid entry point found in {script_name}.py")
+            raise Exception(f"No valid entry point found in webscraper.py")
 
         # Write logs
-        log_file = f"logs/{script_name}_{timestamp}.log"
+        log_file = f"logs/webscraper_{timestamp}.log"
         with open(log_file, "w") as log:
-            log.write(f"{script_name} ran successfully at {timestamp}\n{json.dumps(result, indent=2)}")
+            log.write(f"webscraper ran successfully at {timestamp}\n{json.dumps(result, indent=2)}")
 
         return {"status": "success", "log": log_file, "output": result}
 
     except Exception as e:
-        log_file = f"logs/{script_name}_{timestamp}.log"
+        log_file = f"logs/webscraper_{timestamp}.log"
         with open(log_file, "w") as log:
-            log.write(f"{script_name} failed at {timestamp}\n{str(e)}")
+            log.write(f"webscraper failed at {timestamp}\n{str(e)}")
         return {"status": "failed", "log": log_file, "error": str(e)}
     
 @app.get("/download-latest-csv")
