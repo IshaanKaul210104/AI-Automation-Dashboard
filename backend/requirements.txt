@@ -1,0 +1,18 @@
+# --- Core dependencies ---
+requests
+beautifulsoup4
+urllib3
+lxml
+
+# --- PDF + Image processing ---
+PyMuPDF
+Pillow
+
+# --- AI Models ---
+transformers
+torch
+ollama
+
+# --- Utilities ---
+numpy
+tqdm
