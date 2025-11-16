@@ -3,5 +3,10 @@
     "url": "https://news.ycombinator.com/",
     "output_format": "csv",
     "max_items": 10
+  },
+  "pdf_summarizer": {
+    "hf_home": "~/.cache/huggingface",
+    "embed_model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "blip_root": "hub/models--Salesforce--blip-image-captioning-large"
   }
 }

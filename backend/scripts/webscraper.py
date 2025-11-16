@@ -60,7 +60,7 @@ def run(params=None, timestamp=None):
     except Exception as e:
         return {"count": 0, "error": str(e)}
 
-    soup = BeautifulSoup(res.text, "html.parser")
+    soup = BeautifulSoup(res.text, "lxml")
     articles = extract_articles(soup, url)
 
     # Save output
@@ -79,6 +79,6 @@ def run(params=None, timestamp=None):
 
     return {
             "count": len(articles),
-            "output": output_dir,
-            "csv_file": csv_path
+            "output": output_dir.replace("\\\\", "/"),
+            "csv_file": csv_path.replace("\\\\", "/")
         }

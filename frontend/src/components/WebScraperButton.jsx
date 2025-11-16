@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { runScript } from "../api/api";
+import { API_BASE } from "../api/api";
 
 export default function WebScraperButton() {
   const [status, setStatus] = useState("");
@@ -27,7 +28,7 @@ export default function WebScraperButton() {
       // Build CSV path for download
       const outputDir = res?.output?.output ?? res?.output ?? "";
       if (outputDir) {
-        const csvUrl = `http://127.0.0.1:8000/${outputDir.replace(/\\/g, "/")}/articles.csv`;
+        const csvUrl = `${API_BASE}/${outputDir.replace(/\\/g, "/")}/articles.csv`;
         setDownloadUrl(csvUrl);
       }
     } catch (err) {

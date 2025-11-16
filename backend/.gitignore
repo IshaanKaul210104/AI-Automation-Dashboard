@@ -1,9 +1,7 @@
-__pycache__/
-*.pyc
-.env
+# Virtual Environment
 venv/
+__pycache__/
+*.log
+uploads/
 outputs/
-logs/
-webscraper/
-*.log 
-logs/
+.DS_Store
