@@ -178,8 +178,8 @@ def run_pdf_summarizer(file: UploadFile = File(...)):
     except Exception as e:
         return {"status": "failed", "error": str(e)}
     finally:
-        # Clean up the temporary file
-        if os.path.exists(temp_path):
+        # Clean up the temporary file only if it is a duplicate
+        if is_duplicate and os.path.exists(temp_path):
             os.remove(temp_path)
 
 
