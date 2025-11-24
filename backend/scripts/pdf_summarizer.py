@@ -206,7 +206,7 @@ def summarize_with_ollama(prompt_text, model="granite3.2:8b", timeout=300):
 # ----------------------
 # Main run() entrypoint
 # ----------------------
-def run(params=None, timestamp=None):
+def run(params=None, timestamp=None, add_to_vector_db: bool = True):
     """
     params: dict expected to contain:
       - file_path: path to saved PDF
@@ -260,8 +260,10 @@ def run(params=None, timestamp=None):
             })
         # embed
         embeddings = embedder.encode(chunks, convert_to_numpy=True, show_progress_bar=False)
-        # save to vector DB
-        save_chunks_and_index(chunks, metas, embeddings)
+        
+        if add_to_vector_db:
+            # save to vector DB
+            save_chunks_and_index(chunks, metas, embeddings)
 
         # log
         with open(log_file, "w", encoding="utf-8") as f:

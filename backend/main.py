@@ -137,36 +137,50 @@ def run_pdf_summarizer(file: UploadFile = File(...)):
 
     # Check for duplicates
     processed_files = get_processed_files()
-    if file_hash in processed_files:
-        original = processed_files[file_hash]
-        return {
-            "status": "duplicate",
-            "message": f"This file is a duplicate of '{original['filename']}' processed at {original['timestamp']}.",
-            "original_filename": original['filename'],
-            "original_timestamp": original['timestamp'],
-        }
+    is_duplicate = file_hash in processed_files
+    original_file_info = processed_files.get(file_hash)
 
-    # Save PDF
     temp_path = os.path.join("uploads", f"{timestamp}_{file.filename}")
+    
+    # Always save the PDF temporarily for summarization
     with open(temp_path, "wb") as f:
         f.write(content)
 
-    # Add to processed files DB
-    add_processed_file(file_hash, file.filename, timestamp)
-
     try:
-        result = pdf_summarizer.run({"file_path": temp_path}, timestamp)
+        # Run summarizer, conditionally adding to vector DB
+        result = pdf_summarizer.run(
+            {"file_path": temp_path}, 
+            timestamp, 
+            add_to_vector_db=not is_duplicate
+        )
+
+        # If not a duplicate, add to processed files DB
+        if not is_duplicate:
+            add_processed_file(file_hash, file.filename, timestamp)
+        
+        response_status = "success"
+        message = "PDF processed successfully."
+        if is_duplicate:
+            response_status = "duplicate_processed"
+            message = f"This file is a duplicate of '{original_file_info['filename']}' processed at {original_file_info['timestamp']}. Summary generated, but not re-indexed."
 
         return {
-            "status": "success",
+            "status": response_status,
+            "message": message,
             "summary_file": result.get("summary_file"),
             "extracted_file": result.get("extracted_file"),
             "vector_db": result.get("vector_db"),
             "chunks_added": result.get("count_chunks"),
+            "original_filename": original_file_info['filename'] if is_duplicate else None,
+            "original_timestamp": original_file_info['timestamp'] if is_duplicate else None,
         }
 
     except Exception as e:
         return {"status": "failed", "error": str(e)}
+    finally:
+        # Clean up the temporary file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 # ---------------------------------------------------

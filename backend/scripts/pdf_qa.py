@@ -44,7 +44,7 @@ def ollama_answer(question, context, model="granite3.2:8b", timeout=600):
     """
 
     prompt = f"""
-You are a helpful assistant. Use ONLY the provided context to answer the question.
+You are a helpful assistant. Use the provided context to answer the question.
 
 Context:
 {context}
