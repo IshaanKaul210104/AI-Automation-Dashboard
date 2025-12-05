@@ -2,7 +2,7 @@ import React from "react";
 import WebScraperButton from "./WebScraperButton";
 import PDFSummarizerButton from "./PDFSummarizerButton";
 import AskQAButton from "./AskQAButton";
-import RunButton from "./RunButton";
+import MLModelRecommender from "./MLModelRecommender";
 
 export default function Dashboard() {
   return (
@@ -25,7 +25,7 @@ export default function Dashboard() {
 
         {/* RIGHT COLUMN – Final functionality */}
         <div className="flex flex-col items-center">
-          <RunButton scriptName="github_fetcher" label="Fetch GitHub Stats" />
+          <MLModelRecommender />
         </div>
         
       </div>

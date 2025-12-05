@@ -3,15 +3,16 @@ import shutil
 import json
 import datetime
 import importlib
-from typing import Dict, Any
+import io
 
+from typing import Dict, Any
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from scripts import pdf_summarizer, pdf_qa
+from scripts import pdf_summarizer, pdf_qa, model_recommender
 
 app = FastAPI(title="Automation Dashboard Backend")
 
@@ -198,5 +199,27 @@ def ask_qa(body: AskQARequest):
         result = pdf_qa.run({"question": question, "top_k": 3})
         return result
 
+    except Exception as e:
+        return {"status": "failed", "error": str(e)}
+    
+@app.post("/run/model_recommender")
+async def run_model_recommender(file: UploadFile = File(...), task: str = "regression", target_col: str | None = None):
+    """
+    Receives:
+      - file: CSV file (multipart/form-data)
+      - task: 'regression' | 'classification' | 'clustering'
+      - target_col: required for regression/classification
+    """
+    # basic checks
+    if not file.filename.lower().endswith(".csv"):
+        return {"status": "failed", "error": "Only CSV uploads allowed."}
+
+    # read into BytesIO
+    content = await file.read()
+    fileobj = io.BytesIO(content)
+
+    try:
+        result = model_recommender.run_from_fileobj(fileobj, task.lower(), target_col)
+        return result
     except Exception as e:
         return {"status": "failed", "error": str(e)}
