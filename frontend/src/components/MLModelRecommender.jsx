@@ -107,19 +107,31 @@ export default function ModelRecommenderButton() {
       {status && <p className="mt-3 text-sm text-gray-700">{status}</p>}
 
       {result && (
-        <div className="mt-3 bg-gray-50 p-3 rounded text-sm">
-          {result.status === "success" ? (
-            <>
-              <p><strong>Recommended model:</strong> {result.recommended_model}</p>
-              <p><strong>Why:</strong> {result.reason}</p>
-              <p><strong>Meta features:</strong> <pre className="whitespace-pre-wrap">{JSON.stringify(result.meta_features, null, 2)}</pre></p>
-              <p><strong>Metrics:</strong> <pre className="whitespace-pre-wrap">{JSON.stringify(result.metrics, null, 2)}</pre></p>
-            </>
-          ) : (
-            <p className="text-red-600">Error: {result.error}</p>
-          )}
-        </div>
-      )}
+      <div className="mt-3 bg-gray-50 p-3 rounded text-sm">
+        {result.status === "success" ? (
+          <>
+            <p><strong>Recommended model:</strong> {result.recommended_model}</p>
+            <p><strong>Why:</strong> {result.reason}</p>
+
+            <div className="mt-2">
+              <strong>Meta features:</strong>
+              <pre className="whitespace-pre-wrap bg-white p-2 rounded border">
+                {JSON.stringify(result.meta_features, null, 2)}
+              </pre>
+            </div>
+
+            <div className="mt-2">
+              <strong>Metrics:</strong>
+              <pre className="whitespace-pre-wrap bg-white p-2 rounded border">
+                {JSON.stringify(result.metrics, null, 2)}
+              </pre>
+            </div>
+          </>
+        ) : (
+          <p className="text-red-600">Error: {result.error}</p>
+        )}
+      </div>
+    )}
     </div>
   );
 }

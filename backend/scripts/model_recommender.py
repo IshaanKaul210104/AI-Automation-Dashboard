@@ -83,11 +83,17 @@ def evaluate_model(model, X, y=None, task="regression"):
             labels = model.labels_
         else:
             labels = model.predict(X)
-        # if only one label or failure, silhouette is undefined; handle safely
-        try:
-            res["silhouette"] = float(silhouette_score(X, labels))
-        except Exception:
+
+        # ✅ SAFETY: silhouette requires at least 2 clusters and non-degenerate feature space
+        unique_labels = np.unique(labels)
+
+        if len(unique_labels) < 2 or X.shape[0] <= len(unique_labels):
             res["silhouette"] = None
+        else:
+            try:
+                res["silhouette"] = float(silhouette_score(X, labels))
+            except Exception:
+                res["silhouette"] = None
     return res
 
 def run_from_fileobj(fileobj: io.BytesIO, task: str, target_col: str | None = None):
@@ -139,22 +145,25 @@ def run_from_fileobj(fileobj: io.BytesIO, task: str, target_col: str | None = No
             y = combined[target_col]
             X_numeric = combined.drop(columns=[target_col])
     else:
-        combined = X_numeric.dropna()
+        combined = X.dropna()
         if combined.shape[0] == 0:
             return {"status": "failed", "error": "All rows contain missing values after dropna."}
-        X_numeric = combined
+        X = combined
 
     # scale
     scaler = StandardScaler()
     # Fit + transform
+    X = combined.drop(columns=[target_col]) if y is not None else combined
     X_processed = preprocessor.fit_transform(X)
 
     # For meta-features, keep numeric only (your calculator expects numeric input)
-    X_numeric_only = X[numeric_cols].copy()
+    X_numeric_only = combined[numeric_cols].copy()
 
     # If no numeric cols exist, create placeholder  (prevents skew/corr errors)
     if X_numeric_only.shape[1] == 0:
         X_numeric_only = pd.DataFrame({"dummy": np.zeros(len(X))})
+    if len(numeric_cols) == 0:
+        X_numeric_only = pd.DataFrame({"dummy": np.zeros(len(combined))})
 
     # Scale numeric features before meta calculations
     scaled_num = StandardScaler().fit_transform(X_numeric_only)
