@@ -5,11 +5,13 @@ import json
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge, LogisticRegression
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.cluster import KMeans, DBSCAN
+from sklearn.model_selection import cross_val_score, KFold, StratifiedKFold
+from xgboost import XGBRegressor, XGBClassifier
 from sklearn.metrics import r2_score, mean_squared_error, accuracy_score, silhouette_score
 from scipy.stats import skew
 
@@ -41,19 +43,38 @@ def calculate_meta_features(X: pd.DataFrame, y: pd.Series | None, task: str = "r
 
 def recommend_model(meta: dict, task: str = "regression"):
     task = task.lower()
+    
     if task == "regression":
-        if meta["avg_skewness"] > 2 or meta["multicollinearity_score"] > 50:
-            return RandomForestRegressor(), "RandomForestRegressor", "High skewness or high multicollinearity detected — using Random Forest."
+        # EXTREME skew or EXTREME multicollinearity → XGBoost
+        if meta["avg_skewness"] > 3 or meta["multicollinearity_score"] > 100:
+            return XGBRegressor(tree_method="hist"), "XGBRegressor", "Extreme skewness or multicollinearity — using XGBoost."
+
+        # Moderate skew or Moderate multicollinearity → Random Forest
+        if meta["avg_skewness"] > 1 or meta["multicollinearity_score"] > 30:
+            return RandomForestRegressor(), "RandomForestRegressor", "Moderate skewness/multicollinearity — using Random Forest."
+
+        # Strong linear correlation → Ridge
         if meta["avg_correlation_with_target"] > 0.5:
             return Ridge(), "Ridge", "Strong linear correlation with target — using Ridge regression."
-        return LinearRegression(), "LinearRegression", "Default: moderate skew/correlation — using Linear Regression."
+
+        # Default → Linear Regression
+        return LinearRegression(), "LinearRegression", "Default case — linear regression."
 
     if task == "classification":
-        if meta["multicollinearity_score"] > 50:
-            return RandomForestClassifier(), "RandomForestClassifier", "High multicollinearity — using Random Forest classifier."
+        # EXTREME multicollinearity → XGBoost
+        if meta["multicollinearity_score"] > 100:
+            return XGBClassifier(tree_method="hist", eval_metric="logloss"), "XGBClassifier", "Extreme multicollinearity — using XGBoost classifier."
+
+        # Moderate multicollinearity → Random Forest
+        if meta["multicollinearity_score"] > 30:
+            return RandomForestClassifier(), "RandomForestClassifier", "Moderate multicollinearity — using Random Forest."
+
+        # Strong correlation → Logistic Regression
         if meta["avg_correlation_with_target"] > 0.4:
-            return LogisticRegression(max_iter=1000), "LogisticRegression", "High correlation with target — using Logistic Regression."
-        return RandomForestClassifier(), "RandomForestClassifier", "Default fallback — using Random Forest classifier."
+            return LogisticRegression(max_iter=1000), "LogisticRegression", "Strong correlation — using Logistic Regression."
+
+        # Default → RandomForest
+        return RandomForestClassifier(), "RandomForestClassifier", "Default fallback — Random Forest classifier."
 
     # clustering
     if meta["avg_skewness"] > 2:
@@ -63,20 +84,27 @@ def recommend_model(meta: dict, task: str = "regression"):
 def evaluate_model(model, X, y=None, task="regression"):
     res = {}
     if task == "regression":
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        model.fit(X_train, y_train)
-        preds = model.predict(X_test)
-        res["r2"] = float(r2_score(y_test, preds))
-        res["mse"] = float(mean_squared_error(y_test, preds))
+        n_samples = X.shape[0]
+        n_splits = 5 if n_samples >= 20 else 3
+        
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+        r2_scores = cross_val_score(model, X, y, cv=kf, scoring="r2")
+        mse_scores = -cross_val_score(model, X, y, cv=kf, scoring="neg_mean_squared_error")
+
+        res["r2"] = float(np.mean(r2_scores))
+        res["mse"] = float(np.mean(mse_scores))
+
     elif task == "classification":
-        # try stratify, fallback gracefully
-        try:
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-        except Exception:
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        model.fit(X_train, y_train)
-        preds = model.predict(X_test)
-        res["accuracy"] = float(accuracy_score(y_test, preds))
+        n_samples = X.shape[0]
+        n_splits = 5 if n_samples >= 20 else 3
+        
+        skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+        acc_scores = cross_val_score(model, X, y, cv=skf, scoring="accuracy")
+
+        res["accuracy"] = float(np.mean(acc_scores))
+
     else:  # clustering
         model.fit(X)
 
@@ -126,6 +154,8 @@ def run_from_fileobj(fileobj: io.BytesIO, task: str, target_col: str | None = No
     if task in ("regression", "classification"):
         y = df[target_col]
         X = df.drop(columns=[target_col])
+        if task == "classification":
+            y = LabelEncoder().fit_transform(y)
     else:
         y = None
         X = df.copy()
