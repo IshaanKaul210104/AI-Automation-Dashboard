@@ -79,22 +79,34 @@ def evaluate_model(model, X, y=None, task="regression"):
         res["accuracy"] = float(accuracy_score(y_test, preds))
     else:  # clustering
         model.fit(X)
+
         if hasattr(model, "labels_"):
             labels = model.labels_
         else:
             labels = model.predict(X)
 
-        # ✅ SAFETY: silhouette requires at least 2 clusters and non-degenerate feature space
+        # unique cluster count
         unique_labels = np.unique(labels)
 
-        if len(unique_labels) < 2 or X.shape[0] <= len(unique_labels):
+        # Invalid for silhouette
+        if len(unique_labels) < 2:
             res["silhouette"] = None
         else:
             try:
-                res["silhouette"] = float(silhouette_score(X, labels))
+                score = silhouette_score(X, labels)
+                res["silhouette"] = None if (np.isnan(score) or np.isinf(score)) else float(score)
             except Exception:
                 res["silhouette"] = None
     return res
+
+def clean_json(obj):
+    if isinstance(obj, float) and (np.isnan(obj) or np.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: clean_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [clean_json(v) for v in obj]
+    return obj
 
 def run_from_fileobj(fileobj: io.BytesIO, task: str, target_col: str | None = None):
     # Read CSV into pandas
@@ -179,10 +191,10 @@ def run_from_fileobj(fileobj: io.BytesIO, task: str, target_col: str | None = No
     # evaluate (train+test)
     metrics = evaluate_model(model, X_processed, y if task in ("regression","classification") else None, task)
 
-    return {
+    return clean_json({
         "status": "success",
         "recommended_model": model_name,
         "reason": reason,
         "meta_features": meta,
         "metrics": metrics,
-    }
+    })
