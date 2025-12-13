@@ -1,18 +1,17 @@
 import os
-import shutil
 import json
 import datetime
 import importlib
 import io
 
 from typing import Dict, Any
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from scripts import pdf_summarizer, pdf_qa, model_recommender
+from scripts import pdf_summarizer, pdf_qa, model_recommender, audio_transcriber
 
 app = FastAPI(title="Automation Dashboard Backend")
 
@@ -107,6 +106,25 @@ def download_latest_csv():
 import hashlib
 
 # ... (other imports)
+
+# Audio Transcriber Endpoint
+@app.post("/run/transcribe_audio")
+def run_transcribe_audio(file: UploadFile, background_tasks: BackgroundTasks,):
+    try:
+        result = audio_transcriber.transcribe_audio(file)
+        filepath = result["filename"]
+        
+        background_tasks.add_task(os.remove, filepath)
+
+        return FileResponse(
+            result["filename"],
+            media_type="text/plain",
+            filename="transcription.txt",
+            background=background_tasks
+        )
+
+    except Exception as e:
+        return {"status": "failed", "error": str(e)}
 
 # ---------------------------------------------------
 # PDF Summarizer

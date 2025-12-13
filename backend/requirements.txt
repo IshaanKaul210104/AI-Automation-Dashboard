@@ -58,3 +58,6 @@ typing_extensions==4.15.0
 urllib3==2.5.0
 uvicorn==0.38.0
 xgboost
+openai-whisper # Use command: python -m pip install git+https://github.com/openai/whisper.git
+torchvision
+torchaudio
