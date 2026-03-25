@@ -5,7 +5,11 @@ import json
 import numpy as np
 import faiss
 import subprocess
+from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
+
+load_dotenv()  # Load environment variables from .env file
+ollama_model = os.getenv("OLLAMA_MODEL")
 
 # -----------------------
 # CONFIG
@@ -38,7 +42,7 @@ def l2_normalize(x):
     return x / norms
 
 
-def ollama_answer(question, context, model="minimax-2.7:cloud", timeout=600):
+def ollama_answer(question, context, model=ollama_model, timeout=600):
     """
     Calls local Ollama model with retrieved context.
     """
