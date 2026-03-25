@@ -38,7 +38,7 @@ def l2_normalize(x):
     return x / norms
 
 
-def ollama_answer(question, context, model="granite3.2:8b", timeout=600):
+def ollama_answer(question, context, model="minimax-2.7:cloud", timeout=600):
     """
     Calls local Ollama model with retrieved context.
     """

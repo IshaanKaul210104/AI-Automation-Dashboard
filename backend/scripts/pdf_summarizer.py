@@ -192,7 +192,7 @@ import ollama
 # ----------------------
 # Ollama summarizer util (via python client)
 # ----------------------
-def summarize_with_ollama(prompt_text, model="granite3.2:8b", timeout=300):
+def summarize_with_ollama(prompt_text, model="minimax-m2.7:cloud", timeout=300):
     try:
         response = ollama.chat(
             model=model,
@@ -235,7 +235,7 @@ def run(params=None, timestamp=None, add_to_vector_db: bool = True):
 
         # 4) save basic outputs
         summary_prompt = f"Summarize the following PDF content in order. Include image descriptions inline:\n\n{ordered_text[:6000]}"
-        summary = summarize_with_ollama(summary_prompt, model=params.get("ollama_model", "granite3.2:8b"))
+        summary = summarize_with_ollama(summary_prompt, model=params.get("ollama_model", "minimax-2.7:cloud"))
 
         summary_path = os.path.join(output_dir, "combined_summary.txt")
         extracted_path = os.path.join(output_dir, "extracted_text.txt")
