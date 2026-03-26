@@ -3,7 +3,6 @@ import os
 import glob
 import json
 import datetime
-from dotenv import load_dotenv
 from io import BytesIO
 
 import fitz  # PyMuPDF
@@ -14,9 +13,6 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import faiss
 import ollama
-
-load_dotenv()
-ollama_model = os.getenv("OLLAMA_MODEL")
 
 # ----------------------
 # Config - loaded from file
@@ -164,27 +160,48 @@ def save_chunks_and_index(all_chunks_texts, all_meta, embeddings):
     # normalize for inner-product (cosine)
     embeddings = l2_normalize(embeddings).astype("float32")
 
-    if os.path.exists(INDEX_PATH) and os.path.exists(CHUNKS_PATH):
+    # -----------------------------
+    # HANDLE FAISS INDEX
+    # -----------------------------
+    if os.path.exists(INDEX_PATH):
         index = faiss.read_index(INDEX_PATH)
-        # check dim
         if index.d != dim:
             raise RuntimeError(f"Existing index dim {index.d} != new dim {dim}")
-        # append
         index.add(embeddings)
-        faiss.write_index(index, INDEX_PATH)
-        # append chunks metadata
-        with open(CHUNKS_PATH, "r", encoding="utf-8") as f:
-            existing = json.load(f)
-        existing.extend(all_meta)
-        with open(CHUNKS_PATH, "w", encoding="utf-8") as f:
-            json.dump(existing, f, ensure_ascii=False, indent=2)
     else:
-        # create new IndexFlatIP (inner product on normalized vectors => cosine)
         index = faiss.IndexFlatIP(dim)
         index.add(embeddings)
-        faiss.write_index(index, INDEX_PATH)
-        with open(CHUNKS_PATH, "w", encoding="utf-8") as f:
-            json.dump(all_meta, f, ensure_ascii=False, indent=2)
+
+    faiss.write_index(index, INDEX_PATH)
+
+    # -----------------------------
+    # HANDLE CHUNKS JSON (FIXED)
+    # -----------------------------
+    if os.path.exists(CHUNKS_PATH):
+        try:
+            with open(CHUNKS_PATH, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+                if not isinstance(existing, list):
+                    existing = []
+        except:
+            existing = []
+    else:
+        existing = []
+
+    # DEBUG (optional but useful)
+    print("Existing chunks:", len(existing))
+    print("New chunks:", len(all_meta))
+
+    existing.extend(all_meta)
+
+    # -----------------------------
+    # SAFE WRITE (prevents corruption)
+    # -----------------------------
+    temp_path = CHUNKS_PATH + ".tmp"
+    with open(temp_path, "w", encoding="utf-8") as f:
+        json.dump(existing, f, ensure_ascii=False, indent=2)
+
+    os.replace(temp_path, CHUNKS_PATH)
 
 # ----------------------
 # Ollama summarizer util (via CLI)
@@ -196,7 +213,7 @@ import ollama
 # ----------------------
 # Ollama summarizer util (via python client)
 # ----------------------
-def summarize_with_ollama(prompt_text, model=ollama_model, timeout=300):
+def summarize_with_ollama(prompt_text, model="granite3.2:8b", timeout=300):
     try:
         response = ollama.chat(
             model=model,
@@ -239,7 +256,7 @@ def run(params=None, timestamp=None, add_to_vector_db: bool = True):
 
         # 4) save basic outputs
         summary_prompt = f"Summarize the following PDF content in order. Include image descriptions inline:\n\n{ordered_text[:6000]}"
-        summary = summarize_with_ollama(summary_prompt, model=params.get("ollama_model", ollama_model))
+        summary = summarize_with_ollama(summary_prompt, model=params.get("ollama_model", "granite3.2:8b"))
 
         summary_path = os.path.join(output_dir, "combined_summary.txt")
         extracted_path = os.path.join(output_dir, "extracted_text.txt")
@@ -259,6 +276,7 @@ def run(params=None, timestamp=None, add_to_vector_db: bool = True):
             metas.append({
                 "text": c,
                 "source_file": os.path.basename(pdf_path),
+                "file_hash": params.get("file_hash"),
                 "chunk_index": i,
                 "timestamp": timestamp
             })

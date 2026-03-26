@@ -22,6 +22,7 @@ class WebscraperRequest(BaseModel):
 
 class AskQARequest(BaseModel):
     question: str
+    file_hash: str | None = None
 # -------------------------------------
 # CORS (React compatibility)
 # -------------------------------------
@@ -168,7 +169,10 @@ def run_pdf_summarizer(file: UploadFile = File(...)):
     try:
         # Run summarizer, conditionally adding to vector DB
         result = pdf_summarizer.run(
-            {"file_path": temp_path}, 
+            {
+                "file_path": temp_path,
+                "file_hash": file_hash
+            }, 
             timestamp, 
             add_to_vector_db=not is_duplicate
         )
@@ -187,6 +191,7 @@ def run_pdf_summarizer(file: UploadFile = File(...)):
             "status": response_status,
             "message": message,
             "summary_file": result.get("summary_file"),
+            "file_hash": file_hash,
             "extracted_file": result.get("extracted_file"),
             "vector_db": result.get("vector_db"),
             "chunks_added": result.get("count_chunks"),
@@ -214,7 +219,11 @@ def ask_qa(body: AskQARequest):
 
     try:
         # pdf_qa.run returns full dict with status, answer, sources, context
-        result = pdf_qa.run({"question": question, "top_k": 3})
+        result = pdf_qa.run({
+            "question": question, 
+            "top_k": 3,
+            "file_hash": body.file_hash
+        })
         return result
 
     except Exception as e:

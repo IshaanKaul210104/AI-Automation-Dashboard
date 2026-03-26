@@ -29,18 +29,17 @@ const PDFSummarizerButton = () => {
     try {
       const response = await uploadFile("pdf_summarizer", selectedFile);
 
-      if (response.status === "success") {
+      if (response.status === "success" || response.status === "duplicate_processed") {
         setStatus("✅ PDF summarized successfully!");
-        setSummaryPath(`/${response.summary_file}`);
-      } else if (response.status === "duplicate") {
-        setStatus(`⚠️ ${response.message}`);
-      }
-      else {
+        setSummaryPath(response.summary_file.startsWith("/") ? response.summary_file : `/${response.summary_file}`);
+      } else {
         setStatus(`❌ Failed: ${response.error}`);
       }
+      console.log("Backend response:", response);
     } catch (error) {
       console.error(error);
       setStatus("❌ An error occurred while summarizing the PDF.");
+      console.log(status);
     } finally {
       setLoading(false);
     }
@@ -50,15 +49,20 @@ const PDFSummarizerButton = () => {
     if (!summaryPath) return;
     const filename = summaryPath.split("/").pop();
 
-    const response = await axios.get(`${API_BASE}${summaryPath}`, {
-      responseType: "blob",
-    });
+    try{
+      const response = await axios.get(`${API_BASE}${summaryPath}`, {
+        responseType: "blob",
+      });
 
-    const blob = new Blob([response.data], { type: "text/plain" });
-    const link = document.createElement("a");
-    link.href = window.URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
+      const blob = new Blob([response.data], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = window.URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+    } catch (error) {
+      console.error("Download failed:", error);
+      setStatus("❌ Download failed.");
+    }
   };
 
   return (

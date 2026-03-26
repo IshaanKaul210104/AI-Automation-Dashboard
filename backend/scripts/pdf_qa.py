@@ -5,11 +5,8 @@ import json
 import numpy as np
 import faiss
 import subprocess
-from dotenv import load_dotenv
+import ollama
 from sentence_transformers import SentenceTransformer
-
-load_dotenv()  # Load environment variables from .env file
-ollama_model = os.getenv("OLLAMA_MODEL")
 
 # -----------------------
 # CONFIG
@@ -42,11 +39,9 @@ def l2_normalize(x):
     return x / norms
 
 
-def ollama_answer(question, context, model=ollama_model, timeout=600):
-    """
-    Calls local Ollama model with retrieved context.
-    """
+import ollama
 
+def ollama_answer(question, context, model="granite3.2:8b"):
     prompt = f"""
 You are a helpful assistant. Use the provided context to answer the question.
 
@@ -59,18 +54,15 @@ Question:
 Answer clearly and concisely:
 """
 
-    proc = subprocess.run(
-        ["ollama", "run", model],
-        input=prompt.encode("utf-8"),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=timeout
-    )
-
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.decode("utf-8"))
-
-    return proc.stdout.decode("utf-8").strip()
+    try:
+        response = ollama.chat(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            options={"temperature": 0.0},
+        )
+        return response["message"]["content"].strip()
+    except Exception as e:
+        return f"[Ollama failed: {e}]"
 
 
 def load_vector_store():
@@ -110,9 +102,13 @@ def run(params=None, timestamp=None):
 
         retrieved_texts = []
         sources = []
+        target_hash = params.get("file_hash")
 
         for idx in I[0]:
             if 0 <= idx < len(chunks):
+                if target_hash and chunks[idx].get("file_hash") != target_hash:
+                    continue
+
                 retrieved_texts.append(chunks[idx]["text"])
                 sources.append({
                     "source_file": chunks[idx]["source_file"],
@@ -120,12 +116,22 @@ def run(params=None, timestamp=None):
                     "text": chunks[idx]["text"]
                 })
 
-        context = "\n\n".join(retrieved_texts)
+        context = "\n\n".join(retrieved_texts[:3])[:4000]
         answer = ollama_answer(question, context)
+        
+        if not answer or not isinstance(answer,str):
+            answer = "No answer could be generated."
+        
+        answer = answer.strip()
+        def clean_text(text):
+            return text.encode("utf-8", "ignore").decode("utf-8")
+        answer = clean_text(answer)
+        context = clean_text(context)
+        print("ANSWER RAW:", repr(answer))
 
         return {
             "status": "success",
-            "answer": answer,
+            "answer": answer if answer else "No answer generated.",
             "sources": sources,
             "retrieved_context": context,
         }
